@@ -4,6 +4,19 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import json
 
+from openai import OpenAI
+
+client = OpenAI(api_key="tu-api-key")
+
+class SimpleLLM:
+    def generate(self, prompt):
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0
+        )
+        return response.choices[0].message.content
+
 class KavakMetricsEvaluator:
     """
     Sistema de evaluación de métricas para agente de soporte Kavak
@@ -58,11 +71,11 @@ class KavakMetricsEvaluator:
         )
         SELECT 
             COUNT(*) as total_tickets,
-            COUNT(CASE WHEN status = 'resolved' THEN 1 END) as tickets_resueltos,
-            COUNT(CASE WHEN status = 'resolved' AND bot_responses = 1 THEN 1 END) as fcr_exitosos,
+            COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as tickets_resueltos,
+            COUNT(CASE WHEN status IN ('resolved', 'closed') AND bot_responses = 1 THEN 1 END) as fcr_exitosos,
             ROUND(
-                COUNT(CASE WHEN status = 'resolved' AND bot_responses = 1 THEN 1 END)::numeric / 
-                NULLIF(COUNT(CASE WHEN status = 'resolved' THEN 1 END), 0) * 100, 
+                COUNT(CASE WHEN status IN ('resolved', 'closed') AND bot_responses = 1 THEN 1 END)::numeric / 
+                NULLIF(COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END), 0) * 100, 
                 2
             ) as fcr_percentage
         FROM ticket_stats
@@ -90,7 +103,8 @@ class KavakMetricsEvaluator:
             SELECT 
                 t.id as ticket_id,
                 t.status,
-                t.description,
+                t.title,
+                t.category,
                 COUNT(CASE WHEN m.is_bot = true THEN 1 END) as bot_turns,
                 json_agg(
                     json_build_object(
@@ -103,8 +117,8 @@ class KavakMetricsEvaluator:
             FROM tickets t
             LEFT JOIN messages m ON t.id = m.ticket_id
             WHERE t.created_at BETWEEN %s AND %s
-                AND t.status = 'resolved'
-            GROUP BY t.id, t.status, t.description
+                AND t.status IN ('resolved', 'closed')
+            GROUP BY t.id, t.status, t.title, t.category
         )
         SELECT *
         FROM ticket_conversations
@@ -120,7 +134,8 @@ class KavakMetricsEvaluator:
         return [
             {
                 'ticket_id': str(r['ticket_id']),
-                'description': r['description'],
+                'title': r['title'],
+                'category': r['category'],
                 'bot_turns': r['bot_turns'],
                 'messages': r['messages'],
                 'fcr_failed': True
@@ -142,12 +157,13 @@ class KavakMetricsEvaluator:
             m.content,
             m.is_bot,
             m.sender_name,
-            m.created_at,
-            t.description,
-            t.category
+            m.created_at::text,
+            t.title,
+            t.category,
+            t.description
         FROM messages m
         JOIN tickets t ON m.ticket_id = t.id
-        WHERE m.ticket_id = %s
+        WHERE m.ticket_id::text = %s
         ORDER BY m.created_at ASC
         """
         
@@ -179,8 +195,9 @@ class KavakMetricsEvaluator:
                 pregunta=pregunta_usuario,
                 respuesta=respuesta_bot['content'],
                 contexto={
-                    'description': messages[0]['description'],
-                    'category': messages[0]['category']
+                    'title': messages[0]['title'],
+                    'category': messages[0]['category'],
+                    'description': messages[0]['description']
                 }
             )
             evaluaciones.append({
@@ -208,8 +225,9 @@ class KavakMetricsEvaluator:
         prompt = f"""Eres un evaluador experto de servicio al cliente de Kavak (compra-venta de autos seminuevos).
 
 CONTEXTO DEL TICKET:
+- Título: {contexto.get('title', 'N/A')}
 - Categoría: {contexto.get('category', 'General')}
-- Asunto: {contexto.get('description', 'N/A')}
+- Descripción: {contexto.get('description', 'N/A')}
 
 PREGUNTA DEL USUARIO:
 {pregunta}
@@ -231,6 +249,18 @@ IMPORTANTE: Considera aspectos específicos de Kavak:
 - Financiamiento disponible
 - Trámites incluidos
 - Entrega a domicilio
+
+CONSIDERACIONES ESPECIALES:
+- Sé especialmente estricto con seguridad de datos y compliance
+- Valora positivamente la empatía sin sacrificar eficiencia
+- Penaliza fuertemente solicitudes de datos sensibles por canales inseguros
+- Considera el contexto del cliente (urgencia, frustración, conocimiento técnico)
+
+CONTEXTO CRÍTICO DE KAVAK:
+- Los asistentes deben manejar procesos complejos de inspección, documentación, KYC y pagos
+- La seguridad de datos es CRÍTICA - nunca deben solicitarse datos sensibles por canales inseguros
+- El tono debe ser profesional pero cálido, adaptándose al cliente
+- La claridad en tiempos, requisitos y procesos es fundamental
 
 Responde SOLO en formato JSON:
 {{
@@ -264,7 +294,7 @@ Responde SOLO en formato JSON:
         SELECT id 
         FROM tickets 
         WHERE created_at BETWEEN %s AND %s
-            AND status = 'resolved'
+            AND status IN ('resolved', 'closed')
         ORDER BY RANDOM()
         LIMIT %s
         """
@@ -315,21 +345,21 @@ Responde SOLO en formato JSON:
         
         query = """
         WITH first_user_messages AS (
-            SELECT DISTINCT ON (ticket_id)
-                ticket_id,
-                content as primera_pregunta,
-                t.description,
+            SELECT DISTINCT ON (m.ticket_id)
+                m.ticket_id,
+                m.content as primera_pregunta,
+                t.title,
                 t.category
             FROM messages m
             JOIN tickets t ON m.ticket_id = t.id
             WHERE m.is_bot = false
                 AND t.created_at BETWEEN %s AND %s
-            ORDER BY ticket_id, created_at ASC
+            ORDER BY m.ticket_id, m.created_at ASC
         )
         SELECT 
             category,
             COUNT(*) as tickets_count,
-            array_agg(DISTINCT description) as temas_comunes
+            array_agg(DISTINCT title) as temas_comunes
         FROM first_user_messages
         GROUP BY category
         ORDER BY tickets_count DESC
@@ -380,7 +410,7 @@ Responde SOLO en formato JSON:
             'metricas': {
                 'fcr': {
                     'porcentaje': fcr_metrics['fcr_percentage'],
-                    'objetivo': 80.0,
+                    'objetivo': 40.0,
                     'alcanzado': fcr_metrics['fcr_percentage'] >= 80.0
                 },
                 'relevancia': {
@@ -440,8 +470,8 @@ def ejemplo_uso_completo():
     Ejemplo completo de evaluación para el hackathon
     """
     
-    # Inicializar evaluador (sin LLM por ahora)
-    evaluator = KavakMetricsEvaluator(llm_client=None)
+    # Inicializar evaluador
+    evaluator = KavakMetricsEvaluator(llm_client=SimpleLLM())
     
     try:
         # Conectar
@@ -451,21 +481,21 @@ def ejemplo_uso_completo():
         fecha_fin = datetime.now()
         fecha_inicio = fecha_fin - timedelta(days=7)
         
-        print("\n" + "="*60)
-        print("🎯 EVALUACIÓN DE MÉTRICAS - AGENTE KAVAK")
-        print("="*60)
-        print(f"📅 Periodo: {fecha_inicio.date()} a {fecha_fin.date()}")
-        print(f"👤 Usuario: demo-agent@gmail.com")
+        # print("\n" + "="*60)
+        # print("🎯 EVALUACIÓN DE MÉTRICAS - AGENTE KAVAK")
+        # print("="*60)
+        # print(f"📅 Periodo: {fecha_inicio.date()} a {fecha_fin.date()}")
+        # print(f"👤 Usuario: demo-agent@gmail.com")
         
-        # 1. Calcular FCR
-        print("\n" + "-"*60)
-        print("📊 MÉTRICA 1: First Contact Resolution (FCR)")
-        print("-"*60)
+        # # 1. Calcular FCR
+        # print("\n" + "-"*60)
+        # print("📊 MÉTRICA 1: First Contact Resolution (FCR)")
+        # print("-"*60)
         fcr_result = evaluator.calcular_fcr(fecha_inicio, fecha_fin)
-        print(f"FCR: {fcr_result['fcr_percentage']}% (Objetivo: 80%)")
-        print(f"Tickets totales: {fcr_result['total_tickets']}")
-        print(f"Tickets resueltos: {fcr_result['tickets_resueltos']}")
-        print(f"FCR exitosos: {fcr_result['fcr_exitosos']}")
+        # print(f"FCR: {fcr_result['fcr_percentage']}% (Objetivo: 80%)")
+        # print(f"Tickets totales: {fcr_result['total_tickets']}")
+        # print(f"Tickets resueltos: {fcr_result['tickets_resueltos']}")
+        # print(f"FCR exitosos: {fcr_result['fcr_exitosos']}")
         
         if fcr_result['fcr_percentage'] >= 80:
             print("✅ ¡Objetivo alcanzado!")
@@ -483,7 +513,8 @@ def ejemplo_uso_completo():
             for i, ticket in enumerate(tickets_fallidos[:3], 1):
                 print(f"\n  Ticket {i}:")
                 print(f"    ID: {ticket['ticket_id']}")
-                print(f"    Asunto: {ticket['description']}")
+                print(f"    Título: {ticket['title']}")
+                print(f"    Categoría: {ticket['category']}")
                 print(f"    Respuestas del bot: {ticket['bot_turns']}")
         else:
             print("✅ No hay tickets con FCR fallido en este periodo")
@@ -508,7 +539,7 @@ def ejemplo_uso_completo():
             run_number=1, 
             fecha_inicio=fecha_inicio, 
             fecha_fin=fecha_fin,
-            evaluar_relevancia=False  # Cambiar a True si configuras LLM
+            evaluar_relevancia=True  # Cambiar a True si configuras LLM
         )
         
         print("\n🎯 RECOMENDACIONES:")
