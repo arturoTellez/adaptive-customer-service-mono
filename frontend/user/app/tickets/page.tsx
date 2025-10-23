@@ -4,74 +4,110 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import Link from 'next/link';
-
-interface Ticket {
-  id: string;
-  title: string;
-  category: string;
-  status: 'active' | 'resolved';
-  createdAt: string;
-  lastMessage?: string;
-  unreadMessages?: number;
-}
+import { api, Ticket } from '@/app/lib/api';
+import { useAuth } from '@/app/lib/AuthContext';
 
 export default function TicketsPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [filter, setFilter] = useState<'all' | 'active' | 'resolved'>('all');
+  const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const mockTickets: Ticket[] = [
-      {
-        id: '1',
-        title: 'Problema con el pago inicial',
-        category: 'Financiamiento',
-        status: 'active',
-        createdAt: '2025-10-20T10:30:00',
-        lastMessage: 'Nuestro equipo está revisando tu caso...',
-        unreadMessages: 2,
-      },
-      {
-        id: '2',
-        title: 'Consulta sobre garantía',
-        category: 'Garantías',
-        status: 'active',
-        createdAt: '2025-10-21T14:20:00',
-        lastMessage: 'La garantía cubre...',
-        unreadMessages: 0,
-      },
-      {
-        id: '3',
-        title: 'Documentación del vehículo',
-        category: 'Documentos',
-        status: 'resolved',
-        createdAt: '2025-10-15T09:15:00',
-        lastMessage: 'Ticket resuelto. ¡Gracias!',
-        unreadMessages: 0,
-      },
-      {
-        id: '4',
-        title: 'Fecha de entrega del auto',
-        category: 'Entrega del Vehículo',
-        status: 'resolved',
-        createdAt: '2025-10-10T16:45:00',
-        lastMessage: 'Tu vehículo será entregado el...',
-        unreadMessages: 0,
-      },
-    ];
-    setTickets(mockTickets);
-  }, []);
+    // Solo redirige si NO está cargando Y no hay usuario
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login');
+      } else {
+        loadTickets();
+      }
+    }
+  }, [user, authLoading, router]);
+
+  const loadTickets = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.getTickets(user.id);
+      setTickets(data);
+    } catch (err) {
+      setError('Error al cargar los tickets');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mostrar loading mientras verifica autenticación
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Navbar />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-kavak-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-kavak-gray-600 text-lg">Cargando...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay usuario después de cargar, no renderizar nada (está redirigiendo)
+  if (!user) return null;
+
+  // Resto del código igual...
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Navbar />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-kavak-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-kavak-gray-600 text-lg">Cargando tickets...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Navbar />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <p className="text-red-600 text-lg mb-4">{error}</p>
+            <button
+              onClick={loadTickets}
+              className="bg-kavak-orange text-white px-6 py-2 rounded-lg hover:bg-kavak-orange-light"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const filteredTickets = tickets.filter((ticket) => {
     if (filter === 'all') return true;
-    return ticket.status === filter;
+    if (filter === 'open') return ticket.status === 'open' || ticket.status === 'in_progress';
+    if (filter === 'resolved') return ticket.status === 'resolved' || ticket.status === 'closed';
+    return true;
   });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
+      case 'open':
+      case 'in_progress':
         return 'bg-kavak-orange/10 text-kavak-orange border-kavak-orange/30';
       case 'resolved':
+      case 'closed':
         return 'bg-green-50 text-green-600 border-green-500/30';
       default:
         return 'bg-kavak-gray-100 text-kavak-gray-600 border-kavak-gray-300';
@@ -80,10 +116,14 @@ export default function TicketsPage() {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'active':
-        return 'Activo';
+      case 'open':
+        return 'Abierto';
+      case 'in_progress':
+        return 'En Progreso';
       case 'resolved':
         return 'Resuelto';
+      case 'closed':
+        return 'Cerrado';
       default:
         return status;
     }
@@ -125,14 +165,16 @@ export default function TicketsPage() {
             Todos <span className="ml-2 opacity-75">({tickets.length})</span>
           </button>
           <button
-            onClick={() => setFilter('active')}
+            onClick={() => setFilter('open')}
             className={`px-8 py-3 rounded-xl font-medium transition-all ${
-              filter === 'active'
+              filter === 'open'
                 ? 'bg-kavak-orange text-white shadow-lg'
                 : 'text-kavak-gray-700 hover:bg-kavak-gray-50'
             }`}
           >
-            Activos <span className="ml-2 opacity-75">({tickets.filter(t => t.status === 'active').length})</span>
+            Activos <span className="ml-2 opacity-75">
+              ({tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length})
+            </span>
           </button>
           <button
             onClick={() => setFilter('resolved')}
@@ -142,7 +184,9 @@ export default function TicketsPage() {
                 : 'text-kavak-gray-700 hover:bg-kavak-gray-50'
             }`}
           >
-            Resueltos <span className="ml-2 opacity-75">({tickets.filter(t => t.status === 'resolved').length})</span>
+            Resueltos <span className="ml-2 opacity-75">
+              ({tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length})
+            </span>
           </button>
         </div>
 
@@ -184,11 +228,6 @@ export default function TicketsPage() {
                             <h3 className="font-bold text-kavak-navy text-xl group-hover:text-kavak-orange transition-colors">
                               {ticket.title}
                             </h3>
-                            {ticket.unreadMessages! > 0 && (
-                              <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                                {ticket.unreadMessages}
-                              </span>
-                            )}
                           </div>
                           
                           <div className="flex flex-wrap gap-3 mb-4">
@@ -200,14 +239,12 @@ export default function TicketsPage() {
                             </span>
                           </div>
 
-                          {ticket.lastMessage && (
-                            <p className="text-kavak-gray-600 text-sm mb-3 line-clamp-1">
-                              {ticket.lastMessage}
-                            </p>
-                          )}
+                          <p className="text-kavak-gray-600 text-sm mb-3 line-clamp-2">
+                            {ticket.description}
+                          </p>
 
                           <p className="text-kavak-gray-500 text-xs">
-                            {new Date(ticket.createdAt).toLocaleDateString('es-MX', {
+                            {new Date(ticket.created_at).toLocaleDateString('es-MX', {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric',

@@ -9,7 +9,11 @@ class UserBase(BaseModel):
     name: str
 
 class UserCreate(UserBase):
-    pass
+    password: str  # NUEVO CAMPO
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
 class User(UserBase):
     id: UUID
@@ -17,6 +21,10 @@ class User(UserBase):
     
     class Config:
         from_attributes = True
+
+class UserResponse(User):
+    """Respuesta sin password"""
+    pass
 
 # Ticket Schemas
 class TicketBase(BaseModel):
@@ -43,9 +51,6 @@ class Ticket(TicketBase):
     class Config:
         from_attributes = True
 
-class TicketWithMessages(Ticket):
-    messages: List['Message'] = []
-
 # Message Schemas
 class MessageBase(BaseModel):
     content: str
@@ -59,6 +64,13 @@ class Message(MessageBase):
     id: UUID
     ticket_id: UUID
     created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# TicketWithMessages
+class TicketWithMessages(Ticket):
+    messages: List[Message] = []
     
     class Config:
         from_attributes = True

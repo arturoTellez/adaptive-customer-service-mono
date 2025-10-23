@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from .. import crud, schemas
@@ -9,12 +9,12 @@ from ..database import get_db
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 @router.get("/stats", response_model=schemas.TicketStats)
-def get_stats(user_id: UUID = None, db: Session = Depends(get_db)):
+def get_stats(user_id: Optional[UUID] = None, db: Session = Depends(get_db)):
     """Obtener estadísticas de tickets"""
     return crud.get_ticket_stats(db, user_id)
 
 @router.get("/", response_model=List[schemas.Ticket])
-def get_tickets(user_id: UUID = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_tickets(user_id: Optional[UUID] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Obtener lista de tickets"""
     return crud.get_tickets(db, user_id, skip, limit)
 

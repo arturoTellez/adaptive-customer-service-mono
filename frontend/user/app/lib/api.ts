@@ -1,6 +1,20 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Tipos
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  created_at: string;
+}
+
+export interface LoginResponse {
+  id: string;
+  email: string;
+  name: string;
+  created_at: string;
+}
+
 export interface Ticket {
   id: string;
   user_id: string;
@@ -29,8 +43,45 @@ export interface TicketStats {
   closed: number;
 }
 
+export interface TicketWithMessages extends Ticket {
+  messages: Message[];
+}
+
 // API Functions
 export const api = {
+  // Auth
+  async signup(data: { email: string; name: string; password: string }): Promise<User> {
+    const response = await fetch(`${API_URL}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Error al registrar usuario');
+    }
+    return response.json();
+  },
+
+  async login(email: string, password: string): Promise<LoginResponse> {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Error al iniciar sesión');
+    }
+    return response.json();
+  },
+
+  async getCurrentUser(userId: string): Promise<User> {
+    const response = await fetch(`${API_URL}/auth/me?user_id=${userId}`);
+    if (!response.ok) throw new Error('Error al obtener usuario');
+    return response.json();
+  },
+
   // Tickets
   async getTickets(userId?: string): Promise<Ticket[]> {
     const url = userId ? `${API_URL}/tickets/?user_id=${userId}` : `${API_URL}/tickets/`;
@@ -39,7 +90,7 @@ export const api = {
     return response.json();
   },
 
-  async getTicket(ticketId: string): Promise<Ticket & { messages: Message[] }> {
+  async getTicket(ticketId: string): Promise<TicketWithMessages> {
     const response = await fetch(`${API_URL}/tickets/${ticketId}`);
     if (!response.ok) throw new Error('Error al obtener ticket');
     return response.json();
