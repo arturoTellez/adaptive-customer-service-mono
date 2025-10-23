@@ -155,7 +155,7 @@ export default function AdminDashboardPage() {
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white shadow-2xl transform hover:scale-105 transition-all">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-semibold opacity-90 mb-1">Tiempo Promedio</h3>
+                  <h3 className="text-sm font-semibold opacity-90 mb-1">Mensajes Promedio</h3>
                   <p className="text-xs opacity-75">Resolución de tickets</p>
                 </div>
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
@@ -165,7 +165,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <p className="text-5xl font-bold mb-2">{stats.average_resolution_time.toFixed(0)}</p>
-              <p className="text-sm opacity-90">minutos</p>
+              <p className="text-sm opacity-90">mensajes</p>
             </div>
           </div>
         </div>
