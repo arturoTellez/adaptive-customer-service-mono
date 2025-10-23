@@ -7,7 +7,7 @@ from ..database import get_db
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
-@router.post("/signup", response_model=schemas.UserResponse)
+@router.post("/signup", response_model=schemas.User)  # CAMBIAR de UserResponse a User
 def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
     """Registrar un nuevo usuario"""
     # Verificar si el email ya existe
@@ -39,10 +39,11 @@ def login(user_login: schemas.UserLogin, db: Session = Depends(get_db)) -> Dict:
         "id": str(user.id),
         "email": user.email,
         "name": user.name,
+        "role": user.role,  # AGREGAR role
         "created_at": user.created_at.isoformat()
     }
 
-@router.get("/me", response_model=schemas.UserResponse)
+@router.get("/me", response_model=schemas.User)  # CAMBIAR de UserResponse a User
 def get_current_user(user_id: str, db: Session = Depends(get_db)):
     """Obtener información del usuario actual"""
     from uuid import UUID
