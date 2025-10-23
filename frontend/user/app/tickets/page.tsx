@@ -166,7 +166,7 @@ export default function TicketsPage() {
           ) : (
             filteredTickets.map((ticket) => (
               <Link key={ticket.id} href={`/tickets/${ticket.id}`}>
-                <div className="bg-white rounded-2xl p-8 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-kavak-gray-100 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:border-kavak-orange/50 transition-all duration-300 cursor-pointer group">
+                <div className="bg-white rounded-2xl p-8 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-kavak-gray-100 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:border-kavak-orange/50 transition-all duration-300 cursor-pointer group mb-4">
                   <div className="flex flex-col sm:flex-row justify-between gap-6">
                     {/* Left Side */}
                     <div className="flex-1">

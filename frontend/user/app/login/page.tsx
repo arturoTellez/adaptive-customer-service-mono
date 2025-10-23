@@ -29,13 +29,13 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-kavak-navy via-kavak-blue to-kavak-blue-light flex items-center justify-center p-6">
       <div className="max-w-md w-full">
         {/* Logo Card */}
-        <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8 text-center transform hover:scale-105 transition-transform">
+       {/*  <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8 text-center transform hover:scale-105 transition-transform">
           <div className="w-32 h-32 bg-gradient-to-br from-kavak-navy to-kavak-blue rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
             <span className="text-white text-6xl font-bold">K</span>
           </div>
           <h1 className="text-4xl font-bold text-kavak-navy mb-2">Kavak</h1>
           <p className="text-kavak-gray-600 text-lg">Centro de Soporte</p>
-        </div>
+        </div> */}
 
         {/* Login Form */}
         <div className="bg-white rounded-3xl shadow-2xl p-10">

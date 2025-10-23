@@ -123,92 +123,87 @@ export default function TicketChatPage() {
     );
   }
 
-  return (
+return (
     <div className="min-h-screen bg-white flex flex-col">
       <Navbar />
       
-      {/* Ticket Header */}
-      <div className="bg-white border-b-2 border-kavak-gray-100">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-8">
-          <button
-            onClick={() => router.push('/tickets')}
-            className="flex items-center text-kavak-blue hover:text-kavak-orange transition-colors mb-6 group"
-          >
-            <svg className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span className="font-medium">Volver a Tickets</span>
-          </button>
+      {/* Ticket Header - Más compacto */}
+      <div className="bg-white border-b border-kavak-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left side - Back button + Title */}
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <button
+                onClick={() => router.push('/tickets')}
+                className="flex-shrink-0 w-9 h-9 flex items-center justify-center text-kavak-blue hover:text-kavak-orange hover:bg-kavak-gray-50 rounded-lg transition-all group"
+              >
+                <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
 
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-3">
-                <h1 className="text-3xl font-bold text-kavak-navy">{ticket.title}</h1>
-                <span
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold ${
-                    ticket.status === 'active'
-                      ? 'bg-kavak-orange/10 text-kavak-orange'
-                      : 'bg-green-50 text-green-600'
-                  }`}
-                >
-                  {ticket.status === 'active' ? 'Activo' : 'Resuelto'}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-4 text-sm text-kavak-gray-600">
-                <span className="flex items-center gap-2 bg-kavak-gray-50 px-4 py-2 rounded-lg">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  {ticket.category}
-                </span>
-                <span className="flex items-center gap-2 bg-kavak-gray-50 px-4 py-2 rounded-lg">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  {new Date(ticket.createdAt).toLocaleDateString('es-MX', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </span>
-                <span className="bg-kavak-gray-50 px-4 py-2 rounded-lg font-medium">
-                  Ticket #{ticket.id}
-                </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-xl font-bold text-kavak-navy truncate">{ticket.title}</h1>
+                  <span
+                    className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${
+                      ticket.status === 'active'
+                        ? 'bg-kavak-orange/10 text-kavak-orange'
+                        : 'bg-green-50 text-green-600'
+                    }`}
+                  >
+                    {ticket.status === 'active' ? 'Activo' : 'Resuelto'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-kavak-gray-600">
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    {ticket.category}
+                  </span>
+                  <span>•</span>
+                  <span>#{ticket.id}</span>
+                  <span>•</span>
+                  <span>{new Date(ticket.createdAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</span>
+                </div>
               </div>
             </div>
 
+            {/* Right side - Resolve button */}
             {ticket.status === 'active' && (
               <button
                 onClick={handleResolveTicket}
-                className="bg-green-500 hover:bg-green-600 text-white font-semibold py-3.5 px-8 rounded-xl transition-all flex items-center shadow-lg hover:shadow-xl transform hover:scale-105"
+                className="flex-shrink-0 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-5 rounded-xl transition-all flex items-center gap-2 shadow-lg hover:shadow-xl text-sm"
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                Marcar como Resuelto
+                <span className="hidden sm:inline">Marcar como Resuelto</span>
+                <span className="sm:hidden">Resuelto</span>
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Chat Container */}
-      <div className="flex-1 max-w-5xl w-full mx-auto px-6 sm:px-8 lg:px-12 py-8 flex flex-col">
-        {/* Messages Area */}
+      {/* Chat Container - Optimizado para una vista */}
+      <div className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-6 sm:px-8 lg:px-12 py-4">
+        {/* Messages Area - Más espacio */}
         <div 
-          className="flex-1 bg-kavak-gray-50 rounded-3xl p-8 mb-6 overflow-y-auto shadow-inner" 
-          style={{ maxHeight: 'calc(100vh - 400px)', minHeight: '400px' }}
+          className="flex-1 bg-kavak-gray-50 rounded-2xl p-6 mb-4 overflow-y-auto" 
+          style={{ height: 'calc(100vh - 280px)' }}
         >
-          <div className="space-y-6">
-            {/* Initial Ticket Message */}
-            <div className="bg-white rounded-2xl p-6 border-l-4 border-kavak-blue shadow-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <svg className="w-5 h-5 text-kavak-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="space-y-4">
+            {/* Initial Ticket Message - Más compacto */}
+            <div className="bg-white rounded-xl p-4 border-l-4 border-kavak-blue shadow-md">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-4 h-4 text-kavak-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <p className="text-sm font-bold text-kavak-navy">Descripción del Ticket</p>
+                <p className="text-xs font-bold text-kavak-navy">Descripción del Ticket</p>
               </div>
-              <p className="text-kavak-gray-700 leading-relaxed">{ticket.description}</p>
+              <p className="text-sm text-kavak-gray-700 leading-relaxed">{ticket.description}</p>
             </div>
 
             {/* Messages */}
@@ -218,23 +213,23 @@ export default function TicketChatPage() {
                 className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[75%] rounded-2xl px-6 py-4 shadow-lg ${
+                  className={`max-w-[75%] rounded-2xl px-5 py-3 shadow-lg ${
                     message.sender === 'user'
                       ? 'bg-gradient-to-br from-kavak-orange to-kavak-orange-light text-white rounded-br-none'
                       : 'bg-white text-kavak-navy rounded-bl-none border border-kavak-gray-100'
                   }`}
                 >
                   {message.sender === 'bot' && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 bg-gradient-to-br from-kavak-navy to-kavak-blue rounded-full flex items-center justify-center shadow-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-6 h-6 bg-gradient-to-br from-kavak-navy to-kavak-blue rounded-full flex items-center justify-center shadow-lg">
                         <span className="text-white text-xs font-bold">K</span>
                       </div>
                       <span className="text-xs font-bold text-kavak-navy">Asistente Kavak</span>
                     </div>
                   )}
-                  <p className="text-[15px] leading-relaxed">{message.text}</p>
+                  <p className="text-sm leading-relaxed">{message.text}</p>
                   <p
-                    className={`text-xs mt-2 ${
+                    className={`text-xs mt-1 ${
                       message.sender === 'user' ? 'text-white/80' : 'text-kavak-gray-500'
                     }`}
                   >
@@ -250,15 +245,15 @@ export default function TicketChatPage() {
             {/* Typing Indicator */}
             {isTyping && (
               <div className="flex justify-start">
-                <div className="bg-white rounded-2xl rounded-bl-none px-6 py-4 border border-kavak-gray-100 shadow-lg">
+                <div className="bg-white rounded-2xl rounded-bl-none px-5 py-3 border border-kavak-gray-100 shadow-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-kavak-navy to-kavak-blue rounded-full flex items-center justify-center shadow-lg">
+                    <div className="w-6 h-6 bg-gradient-to-br from-kavak-navy to-kavak-blue rounded-full flex items-center justify-center shadow-lg">
                       <span className="text-white text-xs font-bold">K</span>
                     </div>
                     <div className="flex gap-1">
-                      <div className="w-2.5 h-2.5 bg-kavak-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2.5 h-2.5 bg-kavak-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2.5 h-2.5 bg-kavak-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-kavak-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-kavak-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-kavak-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
                   </div>
                 </div>
@@ -269,30 +264,30 @@ export default function TicketChatPage() {
           </div>
         </div>
 
-        {/* Input Area */}
-        <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-kavak-gray-100 p-6">
-          <form onSubmit={handleSendMessage} className="flex gap-4">
+        {/* Input Area - Más compacto */}
+        <div className="bg-white rounded-xl shadow-lg border border-kavak-gray-100 p-4">
+          <form onSubmit={handleSendMessage} className="flex gap-3">
             <input
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Escribe tu mensaje aquí..."
-              className="flex-1 px-6 py-4 border-2 border-kavak-gray-200 rounded-xl focus:ring-2 focus:ring-kavak-orange focus:border-transparent transition-all text-kavak-navy placeholder:text-kavak-gray-400"
+              placeholder="Escribe tu mensaje..."
+              className="flex-1 px-4 py-3 border-2 border-kavak-gray-200 rounded-lg focus:ring-2 focus:ring-kavak-orange focus:border-transparent transition-all text-sm text-kavak-navy placeholder:text-kavak-gray-400"
               disabled={ticket.status === 'resolved'}
             />
             <button
               type="submit"
               disabled={!inputMessage.trim() || ticket.status === 'resolved'}
-              className="bg-kavak-orange hover:bg-kavak-orange-light text-white font-semibold px-8 py-4 rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
+              className="bg-kavak-orange hover:bg-kavak-orange-light text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>
           </form>
           {ticket.status === 'resolved' && (
-            <p className="text-sm text-kavak-gray-500 mt-4 text-center bg-kavak-gray-50 py-3 rounded-lg">
-              Este ticket ha sido resuelto. No se pueden enviar más mensajes.
+            <p className="text-xs text-kavak-gray-500 mt-3 text-center bg-kavak-gray-50 py-2 rounded-lg">
+              Este ticket ha sido resuelto
             </p>
           )}
         </div>
