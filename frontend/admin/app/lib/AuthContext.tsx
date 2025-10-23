@@ -8,7 +8,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: string; // AGREGAR ROLE
+  role: string;
 }
 
 interface AuthContextType {
@@ -17,7 +17,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, name: string, password: string) => Promise<void>;
   logout: () => void;
-  isAdmin: boolean; // AGREGAR HELPER
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,29 +40,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    setLoading(true); // ⬅️ AGREGAR ESTO
     try {
       const userData = await api.login(email, password);
       const userObj = {
         id: userData.id,
         email: userData.email,
         name: userData.name,
-        role: userData.role || 'user', // INCLUIR ROLE
+        role: userData.role || 'user',
       };
       setUser(userObj);
       localStorage.setItem('user', JSON.stringify(userObj));
       
       // Redirigir según el rol
       if (userObj.role === 'admin') {
-        router.push('/dashboard');
+        router.push('/admin/dashboard');
       } else {
         router.push('/dashboard');
       }
     } catch (error: any) {
+      setLoading(false); // ⬅️ AGREGAR ESTO
       throw new Error(error.message || 'Error al iniciar sesión');
     }
+    // NO pongas setLoading(false) aquí, deja que la página destino maneje el loading
   };
 
   const signup = async (email: string, name: string, password: string) => {
+    setLoading(true); // ⬅️ AGREGAR ESTO
     try {
       const userData = await api.signup({ email, name, password });
       const userObj = {
@@ -75,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('user', JSON.stringify(userObj));
       router.push('/dashboard');
     } catch (error: any) {
+      setLoading(false); // ⬅️ AGREGAR ESTO
       throw new Error(error.message || 'Error al registrar usuario');
     }
   };
