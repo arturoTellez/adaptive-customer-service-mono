@@ -3,3 +3,5 @@ openai
 python-dotenv 
 pandas 
 tqdm
+sqlalchemy
+psycopg2-binary

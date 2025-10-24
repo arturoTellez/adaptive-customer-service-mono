@@ -39,6 +39,89 @@ def _get_api_key_from_secrets() -> str:
         return key
     raise RuntimeError("Falta API key en .streamlit/secrets.toml (openai_kavak_secret o OPENAI_API_KEY).")
 
+# --- DB Utils (SQLAlchemy con NullPool y sslmode=require) ---
+import os
+import pandas as pd
+import streamlit as st
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
+
+def _get_db_url() -> str:
+    # Prioriza secrets; fallback a env si estás en local
+    try:
+        if "DATABASE_URL" in st.secrets and st.secrets["DATABASE_URL"]:
+            return st.secrets["DATABASE_URL"]
+    except Exception:
+        pass
+    env_url = os.getenv("DATABASE_URL")
+    if env_url:
+        return env_url
+    raise RuntimeError("Falta DATABASE_URL en .streamlit/secrets.toml o como variable de entorno.")
+
+@st.cache_resource(show_spinner=False)
+def make_engine():
+    url = _get_db_url()
+    return create_engine(
+        url,
+        poolclass=NullPool,                           # evita agotar el pool del pooler
+        connect_args={"sslmode": "require", "connect_timeout": 10},
+    )
+
+def fetch_messages_df(
+    status: str | None = None,
+    category: str | None = None,
+    since: str | None = None,   # "YYYY-MM-DD"
+    until: str | None = None,   # "YYYY-MM-DD"
+    limit_tickets: int = 500,
+) -> pd.DataFrame:
+    """
+    Devuelve DataFrame con columnas: ticket_id, content, created_at, is_bot, sender_name
+    Toma los mensajes de tickets recientes (limitados por limit_tickets) y aplica filtros opcionales.
+    """
+    engine = make_engine()
+    sql = text("""
+        WITH ticket_scope AS (
+          SELECT id
+          FROM public.tickets
+          WHERE (:status IS NULL OR status = :status)
+            AND (:category IS NULL OR category = :category)
+          ORDER BY created_at DESC
+          LIMIT :limit_tickets
+        )
+        SELECT m.ticket_id::text AS ticket_id,
+               m.content::text    AS content,
+               m.created_at       AS created_at,
+               m.is_bot           AS is_bot,
+               m.sender_name      AS sender_name
+        FROM public.messages m
+        JOIN ticket_scope s ON s.id = m.ticket_id
+        WHERE (:since IS NULL OR m.created_at >= :since)
+          AND (:until IS NULL OR m.created_at <  :until)
+        ORDER BY m.ticket_id, m.created_at
+    """)
+
+    params = {
+        "status": status if status else None,
+        "category": category if category else None,
+        "since": since if since else None,      # e.g. "2025-10-01"
+        "until": until if until else None,      # e.g. "2025-11-01"
+        "limit_tickets": int(limit_tickets),
+    }
+
+    with engine.begin() as conn:
+        rows = conn.execute(sql, params).mappings().all()
+
+    if not rows:
+        return pd.DataFrame(columns=["ticket_id","content","created_at","is_bot","sender_name"])
+
+    df = pd.DataFrame(rows)
+    df["ticket_id"] = df["ticket_id"].astype(str)
+    df["content"] = df["content"].fillna("").astype(str)
+    if "created_at" in df.columns:
+        df["created_at_dt"] = pd.to_datetime(df["created_at"], errors="coerce")
+        df = df.sort_values(["ticket_id","created_at_dt"], kind="stable")
+    return df
+
 @st.cache_resource(show_spinner=False)
 def make_client() -> OpenAI:
     return OpenAI(api_key=_get_api_key_from_secrets())
@@ -315,12 +398,84 @@ def to_download_button(label: str, data_bytes: bytes, file_name: str, mime: str 
 
 # ---------------------- UI -------------------------
 st.title("Kavak Tooling Proposals")
-st.caption("Sube conversaciones → LLM actualiza intents/tools/prompts/código → revisa, edita y descarga.")
+st.caption("Fuente: DB o CSV → LLM actualiza intents/tools/prompts/código → revisa, edita y descarga.")
 
 with st.sidebar:
     st.subheader("⚙️ Modelo")
     st.text_input("Modelo (fijo)", value=MODEL, disabled=True)
-    st.info("La API key se lee desde st.secrets", icon="🔐")
+    st.info("Keys desde st.secrets (OpenAI y DATABASE_URL).", icon="🔐")
+    source = st.radio("Fuente de datos", ["Base de datos", "CSV"], horizontal=True)
+    st.divider()
+    if source == "Base de datos":
+        st.markdown("**Filtros (opcional):**")
+        status = st.selectbox("Status", ["(todos)","open","in_progress","resolved","closed"], index=0)
+        category = st.text_input("Category (ej. buying/ask/credit/...)", value="")
+        col_s, col_u = st.columns(2)
+        with col_s:
+            since = st.text_input("Desde (YYYY-MM-DD)", value="")
+        with col_u:
+            until = st.text_input("Hasta (YYYY-MM-DD)", value="")
+        limit_tickets = st.number_input("Máx. tickets", min_value=50, max_value=5000, value=500, step=50)
+
+uploaded = None
+if source == "CSV":
+    uploaded = st.file_uploader("Sube el CSV de mensajes (columns: ticket_id, content[, created_at])", type=["csv"])
+
+# Estado
+if "state" not in st.session_state:
+    st.session_state.state = {
+        "df": None,
+        "ticket_text": {},
+        "cfg": _default_base_cfg(),
+        "updated": None,
+        "rank_df": pd.DataFrame(),
+        "tools": [],
+        "prompt_patch": {"system_patch":"", "user_patch":"", "rationale":""},
+        "code_patches": []
+    }
+
+# Carga de datos
+if source == "CSV" and uploaded:
+    try:
+        df = read_messages_csv(uploaded.getvalue())
+        st.session_state.state["df"] = df
+        st.session_state.state["ticket_text"] = group_ticket_text(df)
+        st.success(f"CSV cargado: {len(df)} mensajes • {len(st.session_state.state['ticket_text'])} tickets")
+        st.dataframe(df.head(20), use_container_width=True)
+    except Exception as e:
+        st.error(f"Error leyendo CSV: {e}")
+
+if source == "Base de datos":
+    if st.button("Cargar desde DB", type="primary"):
+        try:
+            st.info("Consultando base de datos…")
+            filt_status = None if 'status' not in locals() or status == "(todos)" else status
+            filt_category = None if 'category' not in locals() or not category.strip() else category.strip()
+            filt_since = None if 'since' not in locals() or not since.strip() else since.strip()
+            filt_until = None if 'until' not in locals() or not until.strip() else until.strip()
+            lim = limit_tickets if 'limit_tickets' in locals() else 500
+
+            df = fetch_messages_df(
+                status=filt_status,
+                category=filt_category,
+                since=filt_since,
+                until=filt_until,
+                limit_tickets=lim,
+            )
+            if df.empty:
+                st.warning("No se encontraron mensajes con los filtros seleccionados.")
+            else:
+                st.session_state.state["df"] = df
+                st.session_state.state["ticket_text"] = group_ticket_text(df)
+                st.success(f"DB cargada: {len(df)} mensajes • {len(st.session_state.state['ticket_text'])} tickets")
+                st.dataframe(df.head(20), use_container_width=True)
+        except Exception as e:
+            st.error(f"Error consultando DB: {e}")
+
+#with st.sidebar:
+#    st.subheader("⚙️ Modelo")
+#    st.text_input("Modelo (fijo)", value=MODEL, disabled=True)
+#    st.info("La API key se lee desde st.secrets", icon="🔐")
 
 uploaded = st.file_uploader("Sube el CSV de mensajes (columns: ticket_id, content[, created_at])", type=["csv"])
 
